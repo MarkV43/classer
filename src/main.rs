@@ -2,9 +2,13 @@ use std::time::Duration;
 
 use ggez::{
     glam::Vec2,
-    graphics::{Canvas, Color, DrawMode, DrawParam, FillOptions, Mesh, Rect},
+    graphics::{Canvas, Color, DrawMode, DrawParam, Image, Rect},
     *,
 };
+
+const MARGIN: f32 = 5.0;
+const BTN_SIZE: f32 = 60.0;
+const BTN_SPACING: f32 = 70.0;
 
 struct Button {
     rect: Rect,
@@ -47,14 +51,23 @@ impl Button {
 
 struct State {
     dt: Duration,
-    btn: Button,
+    buttons_left: Vec<Button>,
+    buttons_right: Vec<Button>,
 }
 
 impl event::EventHandler for State {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
+        let (w, _) = ctx.gfx.drawable_size();
+
         self.dt = ctx.time.delta();
 
-        self.btn.update(ctx)?;
+        for btn in &mut self.buttons_left {
+            btn.update(ctx)?;
+        }
+        for (i, btn) in self.buttons_right.iter_mut().enumerate() {
+            btn.rect.x = w - (i + 1) as f32 * (btn.rect.w + 10.0);
+            btn.update(ctx)?;
+        }
 
         Ok(())
     }
@@ -63,12 +76,12 @@ impl event::EventHandler for State {
         let mut canvas = Canvas::from_frame(ctx, Color::BLACK);
         let (w, _) = ctx.gfx.drawable_size();
 
-        let mouse_pos = ctx.mouse.position();
+        //let mouse_pos = ctx.mouse.position();
 
         let rect = ggez::graphics::Mesh::new_rectangle(
             ctx,
             DrawMode::fill(),
-            Rect::new(0.0, 0.0, w, mouse_pos.y),
+            Rect::new(0.0, 0.0, w, BTN_SIZE + 2.0 * MARGIN),
             Color::RED,
         )?;
 
@@ -80,7 +93,12 @@ impl event::EventHandler for State {
 
         canvas.draw(&text, Vec2::new(100.0, 100.0));
 
-        self.btn.draw(ctx, &mut canvas)?;
+        for btn in &mut self.buttons_left {
+            btn.draw(ctx, &mut canvas)?;
+        }
+        for btn in &mut self.buttons_right {
+            btn.draw(ctx, &mut canvas)?;
+        }
 
         canvas.finish(ctx)?;
 
@@ -91,11 +109,35 @@ impl event::EventHandler for State {
 fn main() {
     let state = State {
         dt: std::time::Duration::new(0, 0),
-        btn: Button {
-            rect: Rect::new(5.0, 5.0, 40.0, 40.0),
-            text: "+".to_owned(),
-            callback: || println!("Botão clicado"),
-        },
+        buttons_left: vec![
+            Button {
+                rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "+".to_owned(),
+                callback: || println!("Botão + clicado"),
+            },
+            Button {
+                rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "-".to_owned(),
+                callback: || println!("Botão - clicado"),
+            },
+            Button {
+                rect: Rect::new(5.0 + 2.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "Limpar".to_owned(),
+                callback: || println!("Botão Limpar clicado"),
+            },
+        ],
+        buttons_right: vec![
+            Button {
+                rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "dir1".to_owned(),
+                callback: || println!("Botão dir1 clicado"),
+            },
+            Button {
+                rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "dir2".to_owned(),
+                callback: || println!("Botão dir2 clicado"),
+            },
+        ],
     };
 
     let c = conf::Conf::new();
