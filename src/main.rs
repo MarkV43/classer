@@ -1,3 +1,5 @@
+mod discriminate;
+
 use std::time::Duration;
 
 use ggez::{
