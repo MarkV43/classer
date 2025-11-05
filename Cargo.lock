@@ -345,6 +345,7 @@ dependencies = [
 name = "classer"
 version = "0.1.0"
 dependencies = [
+ "crevice",
  "ggez",
  "good_lp",
  "nalgebra",

@@ -4,7 +4,7 @@ use std::{env, path, time::Duration};
 
 use ggez::{
     glam::Vec2,
-    graphics::{Canvas, Color, DrawMode, DrawParam, FillOptions, Image, InstanceArray, Rect},
+    graphics::{Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
     mint::Point2,
     winit::event::MouseButton,
     *,
@@ -98,99 +98,6 @@ enum DiscriminationKind {
     Polynomial,
 }
 
-fn find_line_endpoints(vec_a: [f32; 2], scl_b: f32, w: f32, h: f32, eps: f32) -> [Vec2; 2] {
-    const M: f32 = 2.0 * MARGIN + BTN_SIZE;
-
-    let a1 = vec_a[0];
-    let a2 = vec_a[1];
-
-    if a1.abs() <= eps && a2.abs() <= eps {
-        panic!("vec_a cannot be (0,0)");
-    }
-
-    let mut candidates: Vec<Vec2> = Vec::with_capacity(4);
-
-    // left edge x = 0  -> y = -b / a2
-    if a2.abs() > eps {
-        let y = scl_b / a2;
-        if y >= M - eps && y <= h + eps {
-            candidates.push(Vec2::new(0.0, y.clamp(M, h)));
-        }
-    }
-
-    // right edge x = W -> y = -(a1*W + b) / a2
-    if a2.abs() > eps {
-        let y = -(a1 * w - scl_b) / a2;
-        if y >= M - eps && y <= h + eps {
-            candidates.push(Vec2::new(w, y.clamp(M, h)));
-        }
-    }
-
-    // bottom edge y = M -> x = -(a2*M + b) / a1
-    if a1.abs() > eps {
-        let x = -(a2 * M - scl_b) / a1;
-        if x >= -eps && x <= w + eps {
-            candidates.push(Vec2::new(x.clamp(0.0, w), M));
-        }
-    }
-
-    // top edge y = H -> x = -(a2*H + b) / a1
-    if a1.abs() > eps {
-        let x = -(a2 * h - scl_b) / a1;
-        if x >= -eps && x <= w + eps {
-            candidates.push(Vec2::new(x.clamp(0.0, w), h));
-        }
-    }
-
-    // remove duplicates within tolerance
-    let mut unique: Vec<Vec2> = Vec::with_capacity(2);
-    for p in candidates {
-        let mut is_dup = false;
-        for q in &unique {
-            if (p.x - q.x).abs() <= 1e-6 && (p.y - q.y).abs() <= 1e-6 {
-                is_dup = true;
-                break;
-            }
-        }
-        if !is_dup {
-            unique.push(p);
-            if unique.len() == 2 {
-                break;
-            }
-        }
-    }
-
-    // If nothing found, handle exact vertical or horizontal line cases
-    if unique.is_empty() {
-        // vertical line: a2 == 0 -> x = -b / a1
-        if a2.abs() <= eps && a1.abs() > eps {
-            let x = scl_b / a1;
-            if x >= 0.0 - eps && x <= w + eps {
-                return [Vec2::new(x.clamp(0.0, w), M), Vec2::new(x.clamp(0.0, w), h)];
-            }
-        }
-        // horizontal line: a1 == 0 -> y = -b / a2
-        if a1.abs() <= eps && a2.abs() > eps {
-            let y = scl_b / a2;
-            if y >= M - eps && y <= h + eps {
-                return [Vec2::new(0.0, y.clamp(M, h)), Vec2::new(w, y.clamp(M, h))];
-            }
-        }
-
-        // no intersection
-        println!("vec_a: {vec_a:?}\nscl_b: {scl_b}");
-        println!("bounds: 0..{w} ; {M}..{h}");
-        panic!("No intersection found");
-    }
-
-    if unique.len() == 1 {
-        return [unique[0], unique[0]];
-    }
-
-    // two distinct points
-    [unique[0], unique[1]]
-}
-
 struct State {
     dt: Duration,
     buttons_mode: Vec<Button>,
@@ -202,41 +109,54 @@ struct State {
 
     white_points: Vec<Point>,
     black_points: Vec<Point>,
+
+    shader: ggez::graphics::Shader,
+    shader_params: ggez::graphics::ShaderParams<LinearDiscrimination>,
 }
 
 impl State {
     pub fn new(ctx: &mut Context) -> Result<Self, GameError> {
+        let buttons_mode = vec![
+            Button {
+                rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "+".to_owned(),
+                image: Image::from_path(ctx, "/plus.png")?,
+            },
+            Button {
+                rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "-".to_owned(),
+                image: Image::from_path(ctx, "/minus.png")?,
+            },
+            Button {
+                rect: Rect::new(5.0 + 2.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "Paint".to_owned(),
+                image: Image::from_path(ctx, "/fill.png")?,
+            },
+        ];
+
+        let buttons_right = vec![
+            Button {
+                rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "dir1".to_owned(),
+                image: Image::from_path(ctx, "/trash.png")?,
+            },
+            Button {
+                rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
+                text: "dir2".to_owned(),
+                image: Image::from_path(ctx, "/trash.png")?,
+            },
+        ];
+
+        let shader = ggez::graphics::ShaderBuilder::new()
+            .fragment_path("/fragment.wgsl")
+            .build(ctx)?;
+        let shader_params =
+            ggez::graphics::ShaderParamsBuilder::new(&LinearDiscrimination::none()).build(ctx);
+
         Ok(Self {
             dt: std::time::Duration::new(0, 0),
-            buttons_mode: vec![
-                Button {
-                    rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                    text: "+".to_owned(),
-                    image: Image::from_path(ctx, "/plus.png")?,
-                },
-                Button {
-                    rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                    text: "-".to_owned(),
-                    image: Image::from_path(ctx, "/minus.png")?,
-                },
-                Button {
-                    rect: Rect::new(5.0 + 2.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                    text: "Paint".to_owned(),
-                    image: Image::from_path(ctx, "/fill.png")?,
-                },
-            ],
-            buttons_right: vec![
-                Button {
-                    rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                    text: "dir1".to_owned(),
-                    image: Image::from_path(ctx, "/trash.png")?,
-                },
-                Button {
-                    rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                    text: "dir2".to_owned(),
-                    image: Image::from_path(ctx, "/trash.png")?,
-                },
-            ],
+            buttons_mode,
+            buttons_right,
             input_mode: InputMode::Add,
             input_radius: 50.0,
             discr_kind: DiscriminationKind::Linear,
@@ -244,6 +164,9 @@ impl State {
 
             white_points: Vec::new(),
             black_points: Vec::new(),
+
+            shader,
+            shader_params,
         })
     }
 }
@@ -313,6 +236,15 @@ impl event::EventHandler for State {
             DiscriminationKind::Polynomial => todo!(),
         }
 
+        // Update shader params
+        self.shader_params.set_uniforms(
+            ctx,
+            &self
+                .solution
+                .clone()
+                .unwrap_or(LinearDiscrimination::none()),
+        );
+
         Ok(())
     }
 
@@ -320,11 +252,18 @@ impl event::EventHandler for State {
         let mut canvas = Canvas::from_frame(ctx, Color::BLACK);
         let (w, h) = ctx.gfx.drawable_size();
 
-        // Draw the discrimination line if there is one
+        // Draw the discrimination background
         if let Some(sol) = &self.solution {
-            let points = find_line_endpoints(sol.vec_a, sol.scl_b, w, h, 1e-12);
-            let line = ggez::graphics::Mesh::new_line(ctx, &points, 1.5, Color::GREEN)?;
-            canvas.draw(&line, DrawParam::new());
+            canvas.set_shader(&self.shader);
+            canvas.set_shader_params(&self.shader_params);
+            let rect = ggez::graphics::Mesh::new_rectangle(
+                ctx,
+                DrawMode::fill(),
+                Rect::new(0.0, 0.0, w, h),
+                Color::WHITE,
+            )?;
+            canvas.draw(&rect, Vec2::new(0.0, 0.0));
+            canvas.set_default_shader();
         }
 
         // Draw the circles as an instanced mesh

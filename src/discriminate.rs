@@ -1,14 +1,23 @@
-use ggez::{glam::Vec2, mint::Point2};
+use crevice::std140::AsStd140;
+use ggez::glam::Vec2;
 use good_lp::{
     Expression, ProblemVariables, Solution, SolverModel, clarabel, constraint, variable,
 };
-use nalgebra::{Const, DMatrix, DVector, Dyn, VecStorage};
-
 pub type Point = [f32; 2];
 
+#[derive(AsStd140, Clone)]
 pub struct LinearDiscrimination {
-    pub vec_a: [f32; 2],
+    pub vec_a: Vec2,
     pub scl_b: f32,
+}
+
+impl LinearDiscrimination {
+    pub fn none() -> Self {
+        Self {
+            vec_a: Vec2::new(0.0, 0.0),
+            scl_b: 0.0,
+        }
+    }
 }
 
 pub fn linear_discriminate(
@@ -55,16 +64,10 @@ pub fn linear_discriminate(
         .solve()
         .map_err(|e| format!("{e:?}"))?;
 
-    let mut av = [0.0; DIMS];
-    for i in 0..DIMS {
-        av[i] = solution.value(a[i]) as f32;
-    }
-    let bv = solution.value(b) as f32;
+    let vec_a = Vec2::new(solution.value(a[0]) as f32, solution.value(a[1]) as f32);
+    let scl_b = solution.value(b) as f32;
 
-    Ok(LinearDiscrimination {
-        vec_a: av,
-        scl_b: bv,
-    })
+    Ok(LinearDiscrimination { vec_a, scl_b })
 }
 
 #[cfg(test)]
