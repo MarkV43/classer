@@ -143,7 +143,7 @@ impl State {
             Button {
                 rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
                 text: "dir2".to_owned(),
-                image: Image::from_path(ctx, "/trash.png")?,
+                image: Image::from_path(ctx, "/btn_linear.png")?,
             },
         ];
 
