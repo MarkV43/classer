@@ -175,6 +175,8 @@ impl event::EventHandler for State {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         let (w, _) = ctx.gfx.drawable_size();
 
+        let mut changed = false;
+
         self.dt = ctx.time.delta();
 
         for (btn, mode) in self.buttons_mode.iter_mut().zip(InputMode::iter()) {
@@ -186,6 +188,7 @@ impl event::EventHandler for State {
         self.buttons_right[0].update(ctx, || {
             self.white_points.clear();
             self.black_points.clear();
+            changed = true;
         })?;
         self.buttons_right[1].update(ctx, || println!("Change solution type"))?;
 
@@ -194,24 +197,20 @@ impl event::EventHandler for State {
 
         // println!("mpos: {mouse_pos:?}");
 
-        if mouse_pos.y <= BTN_SIZE + 2.0 * MARGIN {
-            return Ok(());
-        }
-
-        let mut changed = false;
-
-        match self.input_mode {
-            InputMode::Add => {
-                if ctx.mouse.button_just_pressed(MouseButton::Left) {
-                    self.black_points.push([mouse_pos.x, mouse_pos.y]);
-                    changed = true;
-                } else if ctx.mouse.button_just_pressed(MouseButton::Right) {
-                    self.white_points.push([mouse_pos.x, mouse_pos.y]);
-                    changed = true;
+        if mouse_pos.y > BTN_SIZE + 2.0 * MARGIN {
+            match self.input_mode {
+                InputMode::Add => {
+                    if ctx.mouse.button_just_pressed(MouseButton::Left) {
+                        self.black_points.push([mouse_pos.x, mouse_pos.y]);
+                        changed = true;
+                    } else if ctx.mouse.button_just_pressed(MouseButton::Right) {
+                        self.white_points.push([mouse_pos.x, mouse_pos.y]);
+                        changed = true;
+                    }
                 }
+                InputMode::Remove => todo!(),
+                InputMode::Paint => todo!(),
             }
-            InputMode::Remove => todo!(),
-            InputMode::Paint => todo!(),
         }
 
         if !changed {
@@ -220,17 +219,15 @@ impl event::EventHandler for State {
 
         if self.black_points.is_empty() || self.white_points.is_empty() {
             self.solution = None;
+            self.shader_params
+                .set_uniforms(ctx, &LinearDiscrimination::none());
             return Ok(());
         }
-
-        println!("{:?}\n{:?}", self.black_points, self.white_points);
 
         // Run discrimination algorithm
         match self.discr_kind {
             DiscriminationKind::Linear => {
-                self.solution = linear_discriminate(&self.black_points, &self.white_points)
-                    .ok()
-                    .inspect(|x| println!("{:?}", x.vec_a));
+                self.solution = linear_discriminate(&self.black_points, &self.white_points).ok();
             }
             DiscriminationKind::Quadratic => todo!(),
             DiscriminationKind::Polynomial => todo!(),
