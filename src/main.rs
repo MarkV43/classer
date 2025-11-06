@@ -1,12 +1,13 @@
 mod discriminate;
 
-use std::{env, path, time::Duration};
+use std::{env, path, time::Duration, vec};
 
 use ggez::{
+    event::EventHandler,
     glam::Vec2,
     graphics::{Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
     mint::Point2,
-    winit::event::MouseButton,
+    winit::event::{MouseButton, MouseScrollDelta},
     *,
 };
 use strum::{EnumIter, IntoEnumIterator};
@@ -103,7 +104,7 @@ struct State {
     buttons_mode: Vec<Button>,
     buttons_right: Vec<Button>,
     input_mode: InputMode,
-    input_radius: f64,
+    input_radius: f32,
     discr_kind: DiscriminationKind,
     solution: Option<LinearDiscrimination>,
 
@@ -171,6 +172,47 @@ impl State {
     }
 }
 
+fn remove_by_radius(vec: &mut Vec<[f32; 2]>, center: Vec2, radius: f32, changed: &mut bool) {
+    let radius_sq = radius * radius;
+    let mut i = 0;
+    loop {
+        if i >= vec.len() {
+            break;
+        }
+        let pos = Vec2::from_array(vec[i]);
+        if pos.distance_squared(center) <= radius_sq {
+            vec.swap_remove(i);
+            *changed = true;
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn paint_by_radius(
+    movefrom: &mut Vec<[f32; 2]>,
+    moveto: &mut Vec<[f32; 2]>,
+    center: Vec2,
+    radius: f32,
+    changed: &mut bool,
+) {
+    let radius_sq = radius * radius;
+    let mut i = 0;
+    loop {
+        if i >= movefrom.len() {
+            break;
+        }
+        let pos = Vec2::from_array(movefrom[i]);
+        if pos.distance_squared(center) <= radius_sq {
+            moveto.push(pos.into());
+            movefrom.swap_remove(i);
+            *changed = true;
+        } else {
+            i += 1;
+        }
+    }
+}
+
 impl event::EventHandler for State {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         let (w, _) = ctx.gfx.drawable_size();
@@ -208,8 +250,42 @@ impl event::EventHandler for State {
                         changed = true;
                     }
                 }
-                InputMode::Remove => todo!(),
-                InputMode::Paint => todo!(),
+                InputMode::Remove => {
+                    if ctx.mouse.button_pressed(MouseButton::Left) {
+                        let mpos = mouse_pos.into();
+                        remove_by_radius(
+                            &mut self.black_points,
+                            mpos,
+                            self.input_radius,
+                            &mut changed,
+                        );
+                        remove_by_radius(
+                            &mut self.white_points,
+                            mpos,
+                            self.input_radius,
+                            &mut changed,
+                        );
+                    }
+                }
+                InputMode::Paint => {
+                    if ctx.mouse.button_pressed(MouseButton::Left) {
+                        paint_by_radius(
+                            &mut self.white_points,
+                            &mut self.black_points,
+                            mouse_pos.into(),
+                            self.input_radius,
+                            &mut changed,
+                        );
+                    } else if ctx.mouse.button_pressed(MouseButton::Right) {
+                        paint_by_radius(
+                            &mut self.black_points,
+                            &mut self.white_points,
+                            mouse_pos.into(),
+                            self.input_radius,
+                            &mut changed,
+                        );
+                    }
+                }
             }
         }
 
@@ -250,7 +326,7 @@ impl event::EventHandler for State {
         let (w, h) = ctx.gfx.drawable_size();
 
         // Draw the discrimination background
-        if let Some(sol) = &self.solution {
+        if self.solution.is_some() {
             canvas.set_shader(&self.shader);
             canvas.set_shader_params(&self.shader_params);
             let rect = ggez::graphics::Mesh::new_rectangle(
@@ -261,6 +337,22 @@ impl event::EventHandler for State {
             )?;
             canvas.draw(&rect, Vec2::new(0.0, 0.0));
             canvas.set_default_shader();
+        }
+
+        // Draw the circle around the mouse
+        match &self.input_mode {
+            InputMode::Add => {}
+            InputMode::Remove | InputMode::Paint => {
+                let circle = ggez::graphics::Mesh::new_circle(
+                    ctx,
+                    DrawMode::stroke(1.0),
+                    ctx.mouse.position(),
+                    self.input_radius,
+                    0.1,
+                    Color::CYAN,
+                )?;
+                canvas.draw(&circle, DrawParam::new());
+            }
         }
 
         // Draw the circles as an instanced mesh
@@ -324,6 +416,12 @@ impl event::EventHandler for State {
 
         // Copy canvas to the screen
         canvas.finish(ctx)?;
+
+        Ok(())
+    }
+
+    fn mouse_wheel_event(&mut self, _ctx: &mut Context, _x: f32, y: f32) -> Result<(), GameError> {
+        self.input_radius += self.input_radius * y * 0.1;
 
         Ok(())
     }
