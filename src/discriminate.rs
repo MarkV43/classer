@@ -88,7 +88,7 @@ mod tests {
 
         let Ok(sol) = sol else { unreachable!() };
 
-        assert_eq!(sol.vec_a, [0.0, -2.0]);
+        assert_eq!(sol.vec_a, Vec2::new(0.0, -2.0));
         assert_eq!(sol.scl_b, -1.0);
     }
 

@@ -6,7 +6,8 @@ use ggez::{
     event::EventHandler,
     glam::Vec2,
     graphics::{
-        Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, MeshBuilder, Rect, StrokeOptions,
+        Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, MeshBuilder, Rect, ScreenImage,
+        StrokeOptions,
     },
     mint::Point2,
     winit::event::{MouseButton, MouseScrollDelta},
@@ -347,7 +348,7 @@ impl event::EventHandler for State {
                 Rect::new(0.0, 0.0, w, h),
                 LIGHT_GRAY,
             )?;
-            canvas.draw(&rect, Vec2::new(0.0, 0.0));
+            canvas.draw(&rect, Vec2::ZERO);
             canvas.set_default_shader();
         }
 
@@ -461,7 +462,7 @@ fn main() {
     };
 
     let mut c = conf::Conf::new();
-    c.window_setup = c.window_setup.vsync(false);
+    c.window_setup = c.window_setup.vsync(false).samples(conf::NumSamples::Four);
     let (mut ctx, event_loop) = ContextBuilder::new("hello_ggez", "test")
         .add_resource_path(resource_dir)
         .default_conf(c)
