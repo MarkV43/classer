@@ -5,7 +5,9 @@ use std::{env, path, time::Duration, vec};
 use ggez::{
     event::EventHandler,
     glam::Vec2,
-    graphics::{Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
+    graphics::{
+        Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, MeshBuilder, Rect, StrokeOptions,
+    },
     mint::Point2,
     winit::event::{MouseButton, MouseScrollDelta},
     *,
@@ -17,6 +19,11 @@ use crate::discriminate::{LinearDiscrimination, Point, linear_discriminate};
 const MARGIN: f32 = 5.0;
 const BTN_SIZE: f32 = 60.0;
 const BTN_SPACING: f32 = 70.0;
+
+// Colors
+const LIGHT_GRAY: Color = Color::new(199.0 / 255.0, 193.0 / 255.0, 174.0 / 255.0, 1.0);
+const DARK_GRAY: Color = Color::new(40.0 / 255.0, 40.0 / 255.0, 40.0 / 255.0, 0.4);
+const GRAY: Color = Color::new(66.0 / 255.0, 66.0 / 255.0, 66.0 / 255.0, 1.0);
 
 struct Button {
     rect: Rect,
@@ -54,14 +61,19 @@ impl Button {
             ctx,
             DrawMode::fill(),
             self.rect,
-            if highlight {
-                Color::from_rgb(200, 200, 200)
-            } else {
-                Color::WHITE
-            },
+            if highlight { LIGHT_GRAY } else { DARK_GRAY },
         )?;
 
         canvas.draw(&mesh, DrawParam::new());
+
+        // Draw the button's border
+        let border = ggez::graphics::Mesh::new_rectangle(
+            ctx,
+            DrawMode::stroke(2.0),
+            self.rect,
+            Color::BLACK,
+        )?;
+        canvas.draw(&border, DrawParam::new());
 
         let text = ggez::graphics::Text::new(&self.text);
 
@@ -120,17 +132,17 @@ impl State {
         let buttons_mode = vec![
             Button {
                 rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                text: "+".to_owned(),
-                image: Image::from_path(ctx, "/plus.png")?,
+                text: "".to_owned(),
+                image: Image::from_path(ctx, "/add.png")?,
             },
             Button {
                 rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                text: "-".to_owned(),
-                image: Image::from_path(ctx, "/minus.png")?,
+                text: "".to_owned(),
+                image: Image::from_path(ctx, "/del.png")?,
             },
             Button {
                 rect: Rect::new(5.0 + 2.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                text: "Paint".to_owned(),
+                text: "".to_owned(),
                 image: Image::from_path(ctx, "/fill.png")?,
             },
         ];
@@ -138,12 +150,12 @@ impl State {
         let buttons_right = vec![
             Button {
                 rect: Rect::new(5.0 + 0.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                text: "dir1".to_owned(),
+                text: "".to_owned(),
                 image: Image::from_path(ctx, "/trash.png")?,
             },
             Button {
                 rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
-                text: "dir2".to_owned(),
+                text: "".to_owned(),
                 image: Image::from_path(ctx, "/btn_linear.png")?,
             },
         ];
@@ -322,7 +334,7 @@ impl event::EventHandler for State {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
-        let mut canvas = Canvas::from_frame(ctx, Color::BLACK);
+        let mut canvas = Canvas::from_frame(ctx, DARK_GRAY);
         let (w, h) = ctx.gfx.drawable_size();
 
         // Draw the discrimination background
@@ -333,7 +345,7 @@ impl event::EventHandler for State {
                 ctx,
                 DrawMode::fill(),
                 Rect::new(0.0, 0.0, w, h),
-                Color::WHITE,
+                LIGHT_GRAY,
             )?;
             canvas.draw(&rect, Vec2::new(0.0, 0.0));
             canvas.set_default_shader();
@@ -345,11 +357,11 @@ impl event::EventHandler for State {
             InputMode::Remove | InputMode::Paint => {
                 let circle = ggez::graphics::Mesh::new_circle(
                     ctx,
-                    DrawMode::stroke(1.0),
+                    DrawMode::stroke(2.0),
                     ctx.mouse.position(),
                     self.input_radius,
                     0.1,
-                    Color::CYAN,
+                    Color::RED,
                 )?;
                 canvas.draw(&circle, DrawParam::new());
             }
@@ -371,14 +383,14 @@ impl event::EventHandler for State {
             instance_array.push(
                 DrawParam::new()
                     .dest(Point2::from_slice(pnt))
-                    .color(Color::RED),
+                    .color(Color::WHITE),
             );
         }
         for pnt in &self.white_points {
             instance_array.push(
                 DrawParam::new()
                     .dest(Point2::from_slice(pnt))
-                    .color(Color::BLUE),
+                    .color(Color::BLACK),
             );
         }
 
@@ -389,23 +401,35 @@ impl event::EventHandler for State {
             ctx,
             DrawMode::fill(),
             Rect::new(0.0, 0.0, w, BTN_SIZE + 2.0 * MARGIN),
-            Color::from_rgb(100, 100, 100),
+            GRAY,
         )?;
 
         canvas.draw(&rect, DrawParam::new());
 
-        let fps = 1.0 / self.dt.as_secs_f64();
+        // Draw the header's border
+        let border = ggez::graphics::Mesh::new_rectangle(
+            ctx,
+            DrawMode::stroke(1.0),
+            Rect::new(0.0, 0.0, w, BTN_SIZE + 2.0 * MARGIN),
+            Color::BLACK,
+        )?;
+        canvas.draw(&border, DrawParam::new());
 
-        let mut text = ggez::graphics::Text::new(format!("{fps:.0}"));
-        text.set_scale(50.0);
-        let txt_size = text.measure(ctx)?;
-        canvas.draw(
-            &text,
-            Vec2::new(
-                3.0 * (BTN_SIZE + MARGIN) + MARGIN + txt_size.x / 2.0,
-                MARGIN,
-            ),
-        );
+        /*
+                // Exibir FPS no header
+                let fps = 1.0 / self.dt.as_secs_f64();
+
+                let mut text = ggez::graphics::Text::new(format!("{fps:.0}"));
+                text.set_scale(50.0);
+                let txt_size = text.measure(ctx)?;
+                canvas.draw(
+                    &text,
+                    Vec2::new(
+                        3.0 * (BTN_SIZE + MARGIN) + MARGIN + txt_size.x / 2.0,
+                        MARGIN,
+                    ),
+                );
+        */
 
         for (btn, mode) in self.buttons_mode.iter_mut().zip(InputMode::iter()) {
             btn.draw(ctx, &mut canvas, self.input_mode == mode)?;
