@@ -139,7 +139,7 @@ impl State {
             Button {
                 rect: Rect::new(5.0 + 1.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
                 text: "".to_owned(),
-                image: Image::from_path(ctx, "/del.png")?,
+                image: Image::from_path(ctx, "/backspace.png")?,
             },
             Button {
                 rect: Rect::new(5.0 + 2.0 * BTN_SPACING, 5.0, BTN_SIZE, BTN_SIZE),
@@ -373,8 +373,8 @@ impl event::EventHandler for State {
             ctx,
             DrawMode::fill(),
             Vec2::new(0.0, 0.0),
-            3.0,
-            0.1,
+            5.0,
+            1.0,
             Color::WHITE,
         )?;
 
