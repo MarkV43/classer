@@ -3,14 +3,10 @@ mod discriminate;
 use std::{env, path, time::Duration, vec};
 
 use ggez::{
-    event::EventHandler,
     glam::Vec2,
-    graphics::{
-        Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, MeshBuilder, Rect, ScreenImage,
-        StrokeOptions,
-    },
+    graphics::{Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
     mint::Point2,
-    winit::event::{MouseButton, MouseScrollDelta},
+    winit::event::MouseButton,
     *,
 };
 use strum::{EnumIter, IntoEnumIterator};
@@ -316,7 +312,7 @@ impl event::EventHandler for State {
         // Run discrimination algorithm
         match self.discr_kind {
             DiscriminationKind::Linear => {
-                self.solution = linear_discriminate(&self.black_points, &self.white_points).ok();
+                self.solution = Some(linear_discriminate(&self.black_points, &self.white_points));
             }
             DiscriminationKind::Quadratic => todo!(),
             DiscriminationKind::Polynomial => todo!(),
