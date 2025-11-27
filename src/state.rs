@@ -1,9 +1,11 @@
 use ggez::{
     Context, GameError, event,
     glam::Vec2,
-    graphics::{self, Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
-    mint::Point2,
-    winit::event::MouseButton,
+    graphics::{Canvas, Color, DrawMode, DrawParam, Image, InstanceArray, Rect},
+    winit::{
+        event::MouseButton,
+        keyboard::{KeyCode, PhysicalKey},
+    },
 };
 use std::time::Duration;
 use strum::{EnumIter, IntoEnumIterator};
@@ -112,7 +114,7 @@ impl State {
 
 impl event::EventHandler for State {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
-        let (w, _) = ctx.gfx.drawable_size();
+        let (w, h) = ctx.gfx.drawable_size();
 
         let mut changed = false;
 
@@ -198,7 +200,8 @@ impl event::EventHandler for State {
         // Run discrimination algorithm
         match self.discr_kind {
             DiscriminationKind::Linear => {
-                self.solution = Some(linear_discriminate(&self.black_points, &self.white_points));
+                let discr = linear_discriminate(&self.black_points, &self.white_points).ok();
+                self.solution = discr;
             }
             DiscriminationKind::Quadratic => todo!(),
             DiscriminationKind::Polynomial => todo!(),
@@ -262,19 +265,31 @@ impl event::EventHandler for State {
 
         let mut instance_array = InstanceArray::new(ctx, None);
 
-        for pnt in &self.black_points {
+        for pos in &self.black_points {
             instance_array.push(
                 DrawParam::new()
-                    .dest(Point2::from_slice(pnt))
+                    .dest(Vec2::from_slice(pos))
                     .color(Color::WHITE),
             );
         }
-        for pnt in &self.white_points {
+        for pos in &self.white_points {
             instance_array.push(
                 DrawParam::new()
-                    .dest(Point2::from_slice(pnt))
+                    .dest(Vec2::from_slice(pos))
                     .color(Color::BLACK),
             );
+        }
+
+        if ctx
+            .keyboard
+            .is_physical_key_just_pressed(&PhysicalKey::Code(KeyCode::KeyH))
+        {
+            println!("let xs = {:.16?};", self.black_points);
+            println!("let ys = {:.16?};", self.white_points);
+            println!("discr: {:?}", self.solution);
+
+            let sol = linear_discriminate(&self.black_points, &self.white_points);
+            println!("sol: {sol:?}");
         }
 
         canvas.draw_instanced_mesh(circle, &instance_array, DrawParam::new());

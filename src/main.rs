@@ -28,5 +28,5 @@ fn main() {
 
     let state = State::new(&mut ctx).unwrap();
 
-    event::run(ctx, event_loop, state);
+    event::run(ctx, event_loop, state).unwrap();
 }
