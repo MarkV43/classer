@@ -22,6 +22,7 @@ pub enum InputMode {
     Paint,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum DiscriminationKind {
     Linear,
@@ -114,7 +115,7 @@ impl State {
 
 impl event::EventHandler for State {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
-        let (w, h) = ctx.gfx.drawable_size();
+        let (w, _) = ctx.gfx.drawable_size();
 
         let mut changed = false;
 

@@ -8,5 +8,7 @@ crevice = "*"
 ggez = "0.10.0-rc0"
 nalgebra = "0.34.1"
 strum = { version = "0.27.2", features = ["derive"] }
-# classer-opt = { git = "https://github.com/MarkV43/classer-opt.git" }
-classer-opt = { path = "../classer-opt" }
+classer-opt = { git = "https://github.com/MarkV43/classer-opt.git" }
+ipm = { git = "https://github.com/MarkV43/ipm.git" }
+# classer-opt = { path = "../classer-opt" }
+# ipm = { path = "../ipm" }
